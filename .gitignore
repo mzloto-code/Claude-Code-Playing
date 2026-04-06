@@ -1,0 +1,5 @@
+node_modules/
+meal_planner.db
+meal_planner.db-shm
+meal_planner.db-wal
+*.db
