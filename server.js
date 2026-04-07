@@ -9,7 +9,9 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'zloto-meal-planner-secret-2026';
-const DB_PATH = path.join(__dirname, 'meal_planner.db');
+// Support Railway persistent volumes: store DB at /data if that mount exists
+const DB_DIR  = process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
+const DB_PATH = path.join(DB_DIR, 'meal_planner.db');
 
 // ─── Database setup ───────────────────────────────────────────────────────────
 const db = new Database(DB_PATH);
@@ -59,6 +61,20 @@ db.exec(`
     notes     TEXT DEFAULT '',
     rated_at  TEXT DEFAULT (datetime('now')),
     UNIQUE(family_id, recipe_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS custom_recipes (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    family_id         INTEGER NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+    name              TEXT NOT NULL,
+    emoji             TEXT DEFAULT '🍽️',
+    serves            TEXT DEFAULT '4',
+    time              TEXT DEFAULT '30 min',
+    leftover_note     TEXT DEFAULT '',
+    tags_json         TEXT DEFAULT '[]',
+    ingredients_json  TEXT DEFAULT '[]',
+    steps_json        TEXT DEFAULT '[]',
+    created_at        TEXT DEFAULT (datetime('now'))
   );
 `);
 
@@ -267,6 +283,51 @@ app.post('/api/ratings', requireAuth, (req, res) => {
   `).run(req.familyId, recipe_id, stars, notes || '');
   res.json({ ok: true });
 });
+
+// ─── Custom recipe routes ─────────────────────────────────────────────────────
+app.get('/api/custom-recipes', requireAuth, (req, res) => {
+  const recipes = db.prepare('SELECT * FROM custom_recipes WHERE family_id = ? ORDER BY created_at DESC').all(req.familyId);
+  res.json({ recipes: recipes.map(parseRecipe) });
+});
+
+app.post('/api/custom-recipes', requireAuth, (req, res) => {
+  const { name, emoji, serves, time, leftover_note, tags, ingredients, steps } = req.body;
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  const result = db.prepare(`
+    INSERT INTO custom_recipes (family_id, name, emoji, serves, time, leftover_note, tags_json, ingredients_json, steps_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(req.familyId, name, emoji || '🍽️', serves || '4', time || '30 min',
+         leftover_note || '', JSON.stringify(tags || []),
+         JSON.stringify(ingredients || []), JSON.stringify(steps || []));
+  const recipe = db.prepare('SELECT * FROM custom_recipes WHERE id = ?').get(result.lastInsertRowid);
+  res.json(parseRecipe(recipe));
+});
+
+app.put('/api/custom-recipes/:id', requireAuth, (req, res) => {
+  const recipe = db.prepare('SELECT * FROM custom_recipes WHERE id = ? AND family_id = ?').get(req.params.id, req.familyId);
+  if (!recipe) return res.status(404).json({ error: 'Recipe not found' });
+  const { name, emoji, serves, time, leftover_note, tags, ingredients, steps } = req.body;
+  db.prepare(`
+    UPDATE custom_recipes SET name=?, emoji=?, serves=?, time=?, leftover_note=?, tags_json=?, ingredients_json=?, steps_json=?
+    WHERE id=?
+  `).run(name || recipe.name, emoji || recipe.emoji, serves || recipe.serves,
+         time || recipe.time, leftover_note ?? recipe.leftover_note,
+         JSON.stringify(tags || []), JSON.stringify(ingredients || []),
+         JSON.stringify(steps || []), req.params.id);
+  const updated = db.prepare('SELECT * FROM custom_recipes WHERE id = ?').get(req.params.id);
+  res.json(parseRecipe(updated));
+});
+
+app.delete('/api/custom-recipes/:id', requireAuth, (req, res) => {
+  const recipe = db.prepare('SELECT * FROM custom_recipes WHERE id = ? AND family_id = ?').get(req.params.id, req.familyId);
+  if (!recipe) return res.status(404).json({ error: 'Recipe not found' });
+  db.prepare('DELETE FROM custom_recipes WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+function parseRecipe(r) {
+  return { ...r, tags: JSON.parse(r.tags_json || '[]'), ingredients: JSON.parse(r.ingredients_json || '[]'), steps: JSON.parse(r.steps_json || '[]') };
+}
 
 // ─── Start server ─────────────────────────────────────────────────────────────
 app.listen(PORT, () => {

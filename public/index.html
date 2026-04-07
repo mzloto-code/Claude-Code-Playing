@@ -235,6 +235,42 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);
 /* ── Empty state ─────────────────── */
 .empty-state{text-align:center;padding:3rem 1rem;color:var(--muted);}
 .empty-state p{font-size:.9rem;margin-bottom:1rem;}
+/* ── Recipes tab ─────────────────── */
+.recipes-wrap{max-width:1100px;margin:0 auto;}
+.recipes-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;gap:12px;flex-wrap:wrap;}
+.recipe-filters{display:flex;gap:6px;flex-wrap:wrap;}
+.rfbtn{padding:5px 14px;border-radius:100px;border:1px solid var(--border);background:#fff;font-size:.8rem;font-weight:500;color:var(--muted);cursor:pointer;transition:all .12s;}
+.rfbtn.active{background:var(--text);color:#fff;border-color:var(--text);}
+.recipe-cards-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2rem;}
+@media(max-width:900px){.recipe-cards-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:540px){.recipe-cards-grid{grid-template-columns:1fr;}}
+.rc-card{background:#fff;border-radius:14px;border:1px solid var(--border);overflow:hidden;transition:box-shadow .15s;}
+.rc-card:hover{box-shadow:0 2px 14px rgba(0,0,0,.08);}
+.rc-card.custom-card{border-color:#c4b5fd;}
+.rc-card-top{padding:.85rem 1rem .7rem;cursor:pointer;}
+.rc-card-emoji{font-size:1.6rem;margin-bottom:.3rem;display:block;}
+.rc-card-name{font-family:'DM Serif Display',serif;font-size:1rem;line-height:1.3;margin-bottom:.35rem;}
+.rc-card-meta{font-size:.68rem;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.rc-card-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:.4rem;}
+.rc-card-body{border-top:1px solid var(--border2);padding:.7rem 1rem;display:none;}
+.rc-card-body.open{display:block;}
+.rc-card-section{margin-bottom:.75rem;}
+.rc-card-section h5{font-size:.64rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.4rem;}
+.rc-card-actions{display:flex;gap:6px;padding:.5rem 1rem .65rem;border-top:1px solid var(--border2);}
+.rc-card-rating{display:flex;align-items:center;gap:3px;padding:.4rem 1rem;border-top:1px solid var(--border2);}
+.rc-custom-badge{font-size:.6rem;background:#ede9fe;color:#5b21b6;border:1px solid #c4b5fd;border-radius:8px;padding:1px 7px;font-weight:600;}
+/* ── Custom recipe form ──────────── */
+.recipe-modal-form{max-width:520px;max-height:88vh;overflow-y:auto;}
+.cr-dynamic-list{display:flex;flex-direction:column;gap:6px;margin-top:.4rem;}
+.cr-row{display:flex;gap:6px;align-items:center;}
+.cr-row input{flex:1;padding:5px 10px;border-radius:8px;border:1px solid var(--border);font-family:'DM Sans',sans-serif;font-size:.8rem;color:var(--text);background:#fff;outline:none;}
+.cr-row input:focus{border-color:var(--mint);}
+.cr-row input.cr-amt{width:90px;flex:none;}
+.cr-row-del{background:none;border:none;font-size:1rem;cursor:pointer;color:var(--muted);padding:2px 4px;flex-shrink:0;}
+.cr-row-del:hover{color:#c00;}
+.cr-tag-opt{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;cursor:pointer;padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:#fff;user-select:none;}
+.cr-tag-opt input{margin:0;}
+.cr-tag-opt:has(input:checked){background:var(--tag);border-color:var(--text);}
 </style>
 </head>
 <body>
@@ -288,6 +324,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);
     <button class="btn btn-tab active" id="tab-lunch" onclick="switchTab('lunch')">🥪 Lunches</button>
     <button class="btn btn-tab" id="tab-dinner" onclick="switchTab('dinner')">🍽️ Dinners</button>
     <button class="btn btn-tab" id="tab-shop" onclick="switchTab('shop')">🛒 Shopping</button>
+    <button class="btn btn-tab" id="tab-recipes" onclick="switchTab('recipes')">🍳 Recipes</button>
     <button class="btn btn-tab" id="tab-profiles" onclick="switchTab('profiles')">👤 Profiles</button>
     <button class="btn btn-green" onclick="sendEmail()">📧 Email Week</button>
     <button class="btn btn-secondary" onclick="copyPlan()">📋 Copy Plan</button>
@@ -327,6 +364,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);
     </div>
   </div>
 
+  <!-- RECIPES TAB -->
+  <div class="tab-panel" id="panel-recipes">
+    <div class="recipes-wrap">
+      <div class="recipes-top">
+        <div class="recipe-filters" id="recipeFilters">
+          <button class="rfbtn active" onclick="filterRecipes('all',this)">All</button>
+          <button class="rfbtn" onclick="filterRecipes('vegetarian',this)">🌿 Vegetarian</button>
+          <button class="rfbtn" onclick="filterRecipes('quick',this)">⚡ Quick</button>
+          <button class="rfbtn" onclick="filterRecipes('custom',this)">⭐ My Recipes</button>
+        </div>
+        <button class="btn btn-green" onclick="openCustomRecipeModal()">+ Create Recipe</button>
+      </div>
+      <div class="recipe-cards-grid" id="recipeCardsGrid"></div>
+    </div>
+  </div>
+
   <!-- PROFILES TAB -->
   <div class="tab-panel" id="panel-profiles">
     <div class="profiles-wrap">
@@ -363,6 +416,45 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeAddMember()">Cancel</button>
       <button class="btn btn-green" onclick="submitAddMember()">Add Member</button>
+    </div>
+  </div>
+</div>
+
+<!-- CUSTOM RECIPE MODAL -->
+<div class="modal-bg" id="customRecipeModal" onclick="closeCustomRecipeModal(event)">
+  <div class="modal-box recipe-modal-form">
+    <h3 id="customRecipeTitle">Create Recipe</h3>
+    <input type="hidden" id="editingRecipeId">
+    <div style="display:grid;grid-template-columns:56px 1fr;gap:8px;margin-bottom:.85rem">
+      <div class="form-group" style="margin:0"><label>Emoji</label><input id="crEmoji" type="text" maxlength="2" value="🍽️" class="pref-input" style="width:100%;text-align:center;font-size:1.3rem"></div>
+      <div class="form-group" style="margin:0"><label>Recipe Name</label><input id="crName" type="text" placeholder="e.g. Chicken Stir-Fry" class="pref-input" style="width:100%"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:.85rem">
+      <div class="form-group" style="margin:0"><label>Serves</label><input id="crServes" type="text" placeholder="e.g. 4–6" class="pref-input" style="width:100%"></div>
+      <div class="form-group" style="margin:0"><label>Prep Time</label><input id="crTime" type="text" placeholder="e.g. 30 min" class="pref-input" style="width:100%"></div>
+    </div>
+    <div class="form-group"><label>Tags</label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        <label class="cr-tag-opt"><input type="checkbox" value="vegetarian"> 🌿 Vegetarian</label>
+        <label class="cr-tag-opt"><input type="checkbox" value="quick"> ⚡ Quick</label>
+        <label class="cr-tag-opt"><input type="checkbox" value="oven"> 🔥 Oven</label>
+        <label class="cr-tag-opt"><input type="checkbox" value="stovetop"> 🥘 Stovetop</label>
+        <label class="cr-tag-opt"><input type="checkbox" value="kid-favorite"> 🌟 Kid Favorite</label>
+      </div>
+    </div>
+    <div class="form-group"><label>Leftover note (what to do with leftovers)</label><input id="crLeftover" type="text" placeholder="e.g. Pack into thermos for lunch the next day" class="pref-input" style="width:100%"></div>
+    <div class="form-group">
+      <label>Ingredients <button type="button" class="pref-add-btn" onclick="addIngRow()" style="margin-left:8px;padding:2px 8px;font-size:.68rem">+ Add</button></label>
+      <div id="crIngList" class="cr-dynamic-list"></div>
+    </div>
+    <div class="form-group">
+      <label>Steps <button type="button" class="pref-add-btn" onclick="addStepRow()" style="margin-left:8px;padding:2px 8px;font-size:.68rem">+ Add</button></label>
+      <div id="crStepList" class="cr-dynamic-list"></div>
+    </div>
+    <div class="form-error" id="crError"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeCustomRecipeModal()">Cancel</button>
+      <button class="btn btn-green" onclick="submitCustomRecipe()">Save Recipe</button>
     </div>
   </div>
 </div>
@@ -480,7 +572,10 @@ async function initApp() {
     accountUsername= profileData.family.username;
     document.getElementById('accountUsername').textContent = '👤 ' + accountUsername;
 
-    const ratingsData = await apiCall('GET','/api/ratings');
+    const [ratingsData] = await Promise.all([
+      apiCall('GET', '/api/ratings'),
+      loadCustomRecipes()
+    ]);
     currentRatings = {};
     ratingsData.ratings.forEach(r => { currentRatings[r.recipe_id] = r; });
 
@@ -740,8 +835,10 @@ async function swapDinner(di,e){
   if(e)e.stopPropagation();
   const currentId=currentDinners[di].id;
   const usedIds=new Set(currentDinners.filter(d=>!d.locked).map(d=>d.id));
-  const candidates=shuffle(dinnerPool.filter(d=>d.id!==currentId&&!usedIds.has(d.id)));
-  const fallback=shuffle(dinnerPool.filter(d=>d.id!==currentId));
+  const customAsPool=currentCustomRecipes.map(r=>({id:'custom-'+r.id,name:r.name,emoji:r.emoji,tags:r.tags.map(t=>({l:t,c:'tag-gray'})),serves:r.serves,time:r.time,leftoverNote:r.leftover_note,leftoverKeys:[],ingredients:r.ingredients,steps:r.steps}));
+  const fullPool=[...dinnerPool,...customAsPool];
+  const candidates=shuffle(fullPool.filter(d=>d.id!==currentId&&!usedIds.has(d.id)));
+  const fallback=shuffle(fullPool.filter(d=>d.id!==currentId));
   const pick=candidates.length>0?candidates[0]:fallback[0];
   if(!pick)return;
   currentDinners[di]=pick;
@@ -1062,6 +1159,7 @@ function switchTab(tab){
   document.querySelectorAll('.btn-tab').forEach(b=>b.classList.remove('active'));
   document.getElementById('panel-'+tab).classList.add('active');
   document.getElementById('tab-'+tab).classList.add('active');
+  if (tab === 'recipes') renderRecipes();
 }
 
 function showToast(msg){
@@ -1129,6 +1227,218 @@ blake:[
   {main:{text:'Black beans + rice (thermos)',note:'Classic, extra salsa on the side',cat:'protein',emoji:'🫘',warm:true,leftover:'black-bean-soup'},veg:{text:'Cherry tomatoes',cat:'veg',emoji:'🍅'},fruit:{text:'Raspberries',cat:'fruit',emoji:'🫐'},extra:{text:'Goldfish crackers',cat:'carb',emoji:'🐟'}},
 ],
 };
+
+// ═══════════════════════════════════════
+//  RECIPES TAB
+// ═══════════════════════════════════════
+let currentCustomRecipes = [];
+let currentRecipeFilter  = 'all';
+
+async function loadCustomRecipes() {
+  try {
+    const data = await apiCall('GET', '/api/custom-recipes');
+    currentCustomRecipes = data.recipes;
+  } catch(e) { currentCustomRecipes = []; }
+}
+
+function filterRecipes(f, btn) {
+  currentRecipeFilter = f;
+  document.querySelectorAll('.rfbtn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderRecipes();
+}
+
+function renderRecipes() {
+  const grid = document.getElementById('recipeCardsGrid');
+  if (!grid) return;
+
+  // Build unified list: built-in + custom
+  const builtIn = [...dinnerPool, tacoTuesdayDinner, pizzaFridayDinner].map(d => ({
+    ...d, custom: false,
+    tags: d.tags.map(t => t.l.toLowerCase())
+  }));
+  const custom = currentCustomRecipes.map(r => ({
+    id: 'custom-' + r.id, _dbId: r.id, custom: true,
+    name: r.name, emoji: r.emoji, serves: r.serves, time: r.time,
+    leftoverNote: r.leftover_note, tags: r.tags,
+    ingredients: r.ingredients.map(i => ({amt: i.amt, item: i.item})),
+    steps: r.steps
+  }));
+  let all = [...builtIn, ...custom];
+
+  // Filter
+  if (currentRecipeFilter === 'vegetarian') {
+    all = all.filter(r => r.tags && r.tags.some(t => (typeof t === 'string' ? t : t.l||'').toLowerCase().includes('vegetarian')));
+  } else if (currentRecipeFilter === 'quick') {
+    all = all.filter(r => r.tags && r.tags.some(t => (typeof t === 'string' ? t : t.l||'').toLowerCase().includes('quick')));
+  } else if (currentRecipeFilter === 'custom') {
+    all = custom;
+  }
+
+  if (!all.length) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><p>No recipes match this filter.</p></div>';
+    return;
+  }
+
+  grid.innerHTML = all.map(r => buildRecipeCard(r)).join('');
+}
+
+function buildRecipeCard(r) {
+  const rating = currentRatings[r.id];
+  const stars  = rating ? rating.stars : 0;
+  const starHtml = Array.from({length:5},(_,i) =>
+    `<span class="star${i<stars?' filled':''}" data-recipe="${r.id}" data-star="${i+1}" onclick="rateRecipeFromCard('${r.id}',${i+1})">${i<stars?'★':'☆'}</span>`
+  ).join('');
+  const searchQ = encodeURIComponent(r.name + ' recipe');
+  const findLink = stars ? `<a href="https://www.google.com/search?q=${searchQ}" target="_blank" rel="noopener" class="find-similar" style="margin-left:4px">🔍 Find similar</a>` : '';
+
+  const tagChips = (r.tags||[]).map(t => {
+    const label = typeof t === 'string' ? t : t.l;
+    const cls   = typeof t === 'string'
+      ? (label.toLowerCase().includes('vegetarian') ? 'tag-green' : 'tag-gray')
+      : (t.c || 'tag-gray');
+    return `<span class="tag ${cls}">${label}</span>`;
+  }).join('');
+
+  const ings  = (r.ingredients||[]).map(i => `<li><span class="ing-amt">${i.amt||''}</span><span>${i.item||''}</span></li>`).join('');
+  const steps = (r.steps||[]).map((s,i) => `<div class="step-row"><span class="recipe-step-num">${i+1}</span><span class="step-text">${s}</span></div>`).join('');
+  const customBadge = r.custom ? '<span class="rc-custom-badge">My Recipe</span>' : '';
+
+  const actionBtns = r.custom
+    ? `<button class="dd-btn-recipe" onclick="editCustomRecipe(${r._dbId})">✏️ Edit</button><button class="dd-btn-swap" onclick="deleteCustomRecipe(${r._dbId},'${r.name.replace(/'/g,"\\'")}')">🗑️ Delete</button>`
+    : `<button class="dd-btn-recipe" onclick="openRecipe('${r.id}')">📖 Full Recipe</button>`;
+
+  return `<div class="rc-card${r.custom?' custom-card':''}">
+    <div class="rc-card-top" onclick="toggleRecipeCard(this)">
+      <span class="rc-card-emoji">${r.emoji}</span>
+      <div class="rc-card-name">${r.name} ${customBadge}</div>
+      <div class="rc-card-meta"><span>⏱ ${r.time}</span><span>👥 ${r.serves}</span></div>
+      <div class="rc-card-tags">${tagChips}</div>
+    </div>
+    <div class="rc-card-rating">${starHtml}${findLink}</div>
+    <div class="rc-card-body">
+      <div class="rc-card-section"><h5>Ingredients</h5><ul class="ing-list">${ings}</ul></div>
+      <div class="rc-card-section"><h5>Steps</h5>${steps}</div>
+      ${r.leftoverNote ? `<div class="lf-note"><strong>⭐ Leftovers</strong> ${r.leftoverNote}</div>` : ''}
+    </div>
+    <div class="rc-card-actions">${actionBtns}</div>
+  </div>`;
+}
+
+function toggleRecipeCard(el) {
+  const body = el.closest('.rc-card').querySelector('.rc-card-body');
+  if (body) body.classList.toggle('open');
+}
+
+async function rateRecipeFromCard(recipeId, stars) {
+  try {
+    await apiCall('POST', '/api/ratings', {recipe_id: recipeId, stars});
+    currentRatings[recipeId] = {recipe_id: recipeId, stars};
+    renderRecipes();
+    renderDinners(); // keep dinner cards in sync
+    showToast('Rating saved!');
+  } catch(e) { showToast('Could not save rating'); }
+}
+
+// ── Custom recipe modal ───────────────
+function openCustomRecipeModal(recipe) {
+  document.getElementById('editingRecipeId').value = recipe ? recipe._dbId : '';
+  document.getElementById('customRecipeTitle').textContent = recipe ? 'Edit Recipe' : 'Create Recipe';
+  document.getElementById('crEmoji').value   = recipe ? recipe.emoji : '🍽️';
+  document.getElementById('crName').value    = recipe ? recipe.name  : '';
+  document.getElementById('crServes').value  = recipe ? recipe.serves : '';
+  document.getElementById('crTime').value    = recipe ? recipe.time   : '';
+  document.getElementById('crLeftover').value= recipe ? (recipe.leftoverNote||'') : '';
+  document.getElementById('crError').textContent = '';
+
+  // Tags
+  document.querySelectorAll('.cr-tag-opt input').forEach(cb => {
+    cb.checked = recipe ? (recipe.tags||[]).includes(cb.value) : false;
+  });
+
+  // Ingredients
+  const ingList = document.getElementById('crIngList');
+  ingList.innerHTML = '';
+  const ings = recipe ? (recipe.ingredients||[]) : [{amt:'',item:''}];
+  ings.forEach(i => addIngRow(i.amt, i.item));
+
+  // Steps
+  const stepList = document.getElementById('crStepList');
+  stepList.innerHTML = '';
+  const stps = recipe ? (recipe.steps||[]) : [''];
+  stps.forEach(s => addStepRow(s));
+
+  document.getElementById('customRecipeModal').classList.add('open');
+  document.getElementById('crName').focus();
+}
+
+function closeCustomRecipeModal(e) {
+  if (!e || e.target === document.getElementById('customRecipeModal'))
+    document.getElementById('customRecipeModal').classList.remove('open');
+}
+
+function addIngRow(amt='', item='') {
+  const div = document.createElement('div'); div.className = 'cr-row';
+  div.innerHTML = `<input class="cr-amt" type="text" placeholder="Amount" value="${amt.replace(/"/g,'&quot;')}"><input type="text" placeholder="Ingredient name" value="${item.replace(/"/g,'&quot;')}"><button class="cr-row-del" onclick="this.parentElement.remove()" title="Remove">✕</button>`;
+  document.getElementById('crIngList').appendChild(div);
+}
+
+function addStepRow(text='') {
+  const div = document.createElement('div'); div.className = 'cr-row';
+  div.innerHTML = `<input type="text" placeholder="Describe this step…" value="${String(text).replace(/"/g,'&quot;')}"><button class="cr-row-del" onclick="this.parentElement.remove()" title="Remove">✕</button>`;
+  document.getElementById('crStepList').appendChild(div);
+}
+
+async function submitCustomRecipe() {
+  const name = document.getElementById('crName').value.trim();
+  if (!name) { document.getElementById('crError').textContent = 'Name is required'; return; }
+  const tags = [...document.querySelectorAll('.cr-tag-opt input:checked')].map(cb => cb.value);
+  const ingredients = [...document.querySelectorAll('#crIngList .cr-row')].map(row => {
+    const inputs = row.querySelectorAll('input');
+    return {amt: inputs[0].value.trim(), item: inputs[1].value.trim()};
+  }).filter(i => i.item);
+  const steps = [...document.querySelectorAll('#crStepList .cr-row input')].map(i => i.value.trim()).filter(Boolean);
+  const payload = {
+    name, emoji: document.getElementById('crEmoji').value||'🍽️',
+    serves: document.getElementById('crServes').value.trim()||'4',
+    time: document.getElementById('crTime').value.trim()||'30 min',
+    leftover_note: document.getElementById('crLeftover').value.trim(),
+    tags, ingredients, steps
+  };
+  try {
+    const editId = document.getElementById('editingRecipeId').value;
+    if (editId) {
+      await apiCall('PUT', '/api/custom-recipes/' + editId, payload);
+    } else {
+      await apiCall('POST', '/api/custom-recipes', payload);
+    }
+    await loadCustomRecipes();
+    closeCustomRecipeModal();
+    renderRecipes();
+    showToast(editId ? 'Recipe updated!' : 'Recipe created!');
+  } catch(e) { document.getElementById('crError').textContent = e.message; }
+}
+
+function editCustomRecipe(dbId) {
+  const recipe = currentCustomRecipes.find(r => r.id === dbId);
+  if (!recipe) return;
+  const r = {
+    _dbId: recipe.id, emoji: recipe.emoji, name: recipe.name,
+    serves: recipe.serves, time: recipe.time, leftoverNote: recipe.leftover_note,
+    tags: recipe.tags, ingredients: recipe.ingredients, steps: recipe.steps
+  };
+  openCustomRecipeModal(r);
+}
+
+async function deleteCustomRecipe(dbId, name) {
+  if (!confirm('Delete recipe "' + name + '"?')) return;
+  try {
+    await apiCall('DELETE', '/api/custom-recipes/' + dbId);
+    currentCustomRecipes = currentCustomRecipes.filter(r => r.id !== dbId);
+    renderRecipes();
+    showToast('Recipe deleted');
+  } catch(e) { showToast('Could not delete recipe'); }
+}
 
 // ═══════════════════════════════════════
 //  ENTRY POINT
