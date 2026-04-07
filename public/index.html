@@ -271,6 +271,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);
 .cr-tag-opt{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;cursor:pointer;padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:#fff;user-select:none;}
 .cr-tag-opt input{margin:0;}
 .cr-tag-opt:has(input:checked){background:var(--tag);border-color:var(--text);}
+/* ── Import URL section ──────────── */
+.import-url-section{background:var(--olive-lt);border:1px solid #a8e0c5;border-radius:10px;padding:.8rem 1rem;margin-bottom:.85rem;}
+.import-url-row{display:flex;gap:8px;margin-top:.4rem;}
+.import-status{font-size:.76rem;margin-top:.45rem;min-height:1.1em;}
+.import-status.loading{color:var(--muted);}
+.import-status.error{color:#c00;}
+.import-status.success{color:var(--mint-dk);font-weight:500;}
+.import-divider{display:flex;align-items:center;gap:10px;margin:.85rem 0 .75rem;color:var(--muted);font-size:.73rem;}
+.import-divider::before,.import-divider::after{content:'';flex:1;height:1px;background:var(--border);}
 </style>
 </head>
 <body>
@@ -425,6 +434,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);
   <div class="modal-box recipe-modal-form">
     <h3 id="customRecipeTitle">Create Recipe</h3>
     <input type="hidden" id="editingRecipeId">
+    <!-- Import from URL -->
+    <div class="import-url-section">
+      <label style="font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Import from a recipe website</label>
+      <div class="import-url-row">
+        <input id="importUrl" type="url" placeholder="Paste an Allrecipes, NYT Cooking, Food Network URL…" class="pref-input" style="flex:1">
+        <button type="button" class="pref-add-btn" id="importBtn" onclick="importFromUrl()" style="white-space:nowrap">Import</button>
+      </div>
+      <div id="importStatus" class="import-status"></div>
+    </div>
+    <div class="import-divider"><span>or fill in manually</span></div>
     <div style="display:grid;grid-template-columns:56px 1fr;gap:8px;margin-bottom:.85rem">
       <div class="form-group" style="margin:0"><label>Emoji</label><input id="crEmoji" type="text" maxlength="2" value="🍽️" class="pref-input" style="width:100%;text-align:center;font-size:1.3rem"></div>
       <div class="form-group" style="margin:0"><label>Recipe Name</label><input id="crName" type="text" placeholder="e.g. Chicken Stir-Fry" class="pref-input" style="width:100%"></div>
@@ -1352,9 +1371,48 @@ async function rateRecipeFromCard(recipeId, stars) {
 }
 
 // ── Custom recipe modal ───────────────
+async function importFromUrl() {
+  const url = document.getElementById('importUrl').value.trim();
+  if (!url) return;
+  const btn = document.getElementById('importBtn');
+  const status = document.getElementById('importStatus');
+  btn.disabled = true; btn.textContent = 'Importing…';
+  status.className = 'import-status loading'; status.textContent = '⏳ Fetching recipe…';
+  try {
+    const data = await apiCall('GET', '/api/parse-recipe?url=' + encodeURIComponent(url));
+    // Populate form fields
+    if (data.name)   document.getElementById('crName').value   = data.name;
+    if (data.serves) document.getElementById('crServes').value = data.serves;
+    if (data.time)   document.getElementById('crTime').value   = data.time;
+    document.getElementById('crSourceUrl').value = url;
+    // Tags
+    document.querySelectorAll('.cr-tag-opt input').forEach(cb => {
+      cb.checked = (data.tags || []).includes(cb.value);
+    });
+    // Ingredients
+    document.getElementById('crIngList').innerHTML = '';
+    (data.ingredients || []).forEach(i => addIngRow(i.amt || '', i.item || ''));
+    if (!data.ingredients?.length) addIngRow();
+    // Steps
+    document.getElementById('crStepList').innerHTML = '';
+    (data.steps || []).forEach(s => addStepRow(s));
+    if (!data.steps?.length) addStepRow();
+    const count = (data.ingredients?.length || 0) + (data.steps?.length || 0);
+    status.className = 'import-status success';
+    status.textContent = `✓ Imported! Found ${data.ingredients?.length || 0} ingredients and ${data.steps?.length || 0} steps. Review below and save.`;
+  } catch(e) {
+    status.className = 'import-status error';
+    status.textContent = '✕ ' + e.message;
+  }
+  btn.disabled = false; btn.textContent = 'Import';
+}
+
 function openCustomRecipeModal(recipe) {
   document.getElementById('editingRecipeId').value = recipe ? recipe._dbId : '';
   document.getElementById('customRecipeTitle').textContent = recipe ? 'Edit Recipe' : 'Create Recipe';
+  document.getElementById('importUrl').value = '';
+  document.getElementById('importStatus').textContent = '';
+  document.getElementById('importStatus').className = 'import-status';
   document.getElementById('crEmoji').value   = recipe ? recipe.emoji : '🍽️';
   document.getElementById('crName').value    = recipe ? recipe.name  : '';
   document.getElementById('crServes').value  = recipe ? recipe.serves : '';

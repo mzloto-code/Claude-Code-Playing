@@ -288,6 +288,110 @@ app.post('/api/ratings', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ─── Recipe URL parser ───────────────────────────────────────────────────────
+app.get('/api/parse-recipe', requireAuth, async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ error: 'url is required' });
+
+  try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol))
+      return res.status(400).json({ error: 'Invalid URL' });
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; FamilyMealPlanner/1.0)',
+        'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
+      },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok)
+      return res.status(422).json({ error: `Could not load that page (HTTP ${response.status})` });
+
+    const html = await response.text();
+
+    // Extract all JSON-LD blocks
+    const ldBlocks = [];
+    const re = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+    let m;
+    while ((m = re.exec(html)) !== null) {
+      try { ldBlocks.push(JSON.parse(m[1])); } catch(e) {}
+    }
+
+    // Find Recipe node (may be top-level or inside @graph)
+    function findRecipe(obj) {
+      if (!obj) return null;
+      if (obj['@type'] === 'Recipe') return obj;
+      if (Array.isArray(obj['@type']) && obj['@type'].includes('Recipe')) return obj;
+      if (obj['@graph']) return obj['@graph'].map(findRecipe).find(Boolean) || null;
+      if (Array.isArray(obj)) return obj.map(findRecipe).find(Boolean) || null;
+      return null;
+    }
+    const recipe = ldBlocks.map(findRecipe).find(Boolean);
+    if (!recipe)
+      return res.status(422).json({ error: 'No recipe found on this page. Try a different recipe site or paste the details manually.' });
+
+    // Parse ISO 8601 duration (PT30M, PT1H30M, P0DT1H, etc.)
+    function parseDuration(d) {
+      if (!d || typeof d !== 'string') return '';
+      const h = d.match(/(\d+)H/i), mn = d.match(/(\d+)M/i);
+      const hrs = h ? parseInt(h[1]) : 0, mins = mn ? parseInt(mn[1]) : 0;
+      if (hrs && mins) return `${hrs} hr ${mins} min`;
+      if (hrs) return `${hrs} hr`;
+      if (mins) return `${mins} min`;
+      return '';
+    }
+    const time = parseDuration(recipe.totalTime) || parseDuration(recipe.cookTime) || parseDuration(recipe.prepTime) || '';
+
+    // Parse ingredient strings into { amt, item }
+    function parseIngredient(str) {
+      str = (str || '').trim();
+      // Match leading quantity + optional unit
+      const unitPat = 'cups?|tbsp|tsp|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|g|grams?|kg|ml|liters?|cans?|bunches?|cloves?|stalks?|slices?|pieces?|pinch|dash';
+      const m = str.match(new RegExp(`^([\\d\\u00BC-\\u00BE\\u2150-\\u215E\\.\\/ ]+(?:${unitPat})\\.?)\\s+(.+)`, 'i'));
+      if (m) return { amt: m[1].trim(), item: m[2].trim() };
+      const m2 = str.match(/^([\d\u00BC-\u00BE\u2150-\u215E\.\/]+)\s+(.+)/);
+      if (m2) return { amt: m2[1].trim(), item: m2[2].trim() };
+      return { amt: '', item: str };
+    }
+    const ingredients = (recipe.recipeIngredient || []).map(parseIngredient).filter(i => i.item);
+
+    // Extract steps (handles HowToStep, HowToSection, plain strings)
+    function extractSteps(instr) {
+      if (!instr) return [];
+      if (typeof instr === 'string') return instr.split(/\n+/).map(s => s.trim()).filter(Boolean);
+      if (Array.isArray(instr)) {
+        return instr.flatMap(s => {
+          if (typeof s === 'string') return [s.trim()];
+          if (s['@type'] === 'HowToSection') return extractSteps(s.itemListElement);
+          return [(s.text || s.name || '').replace(/<[^>]+>/g, '').trim()];
+        }).filter(Boolean);
+      }
+      return [];
+    }
+    const steps = extractSteps(recipe.recipeInstructions);
+
+    const serves = recipe.recipeYield
+      ? (Array.isArray(recipe.recipeYield) ? recipe.recipeYield[0] : recipe.recipeYield).toString()
+      : '4';
+
+    // Auto-detect tags
+    const kw = [(recipe.keywords || ''), (recipe.recipeCategory || '')].join(' ').toLowerCase();
+    const tags = [];
+    if (kw.includes('vegetarian') || kw.includes('vegan')) tags.push('vegetarian');
+    if (parseInt(time) <= 30 || kw.includes('quick') || kw.includes('easy') || kw.includes('30 min')) tags.push('quick');
+    if (kw.match(/oven|bake|roast/)) tags.push('oven');
+    if (kw.match(/stovetop|skillet|sauté|saute|pan/)) tags.push('stovetop');
+    if (kw.includes('kid')) tags.push('kid-favorite');
+
+    res.json({ name: recipe.name || '', serves, time, ingredients, steps, tags, source_url: url });
+  } catch (err) {
+    console.error('Recipe parse error:', err.message);
+    res.status(422).json({ error: 'Could not read that page. Try a different recipe site.' });
+  }
+});
+
 // ─── Custom recipe routes ─────────────────────────────────────────────────────
 app.get('/api/custom-recipes', requireAuth, (req, res) => {
   const recipes = db.prepare('SELECT * FROM custom_recipes WHERE family_id = ? ORDER BY created_at DESC').all(req.familyId);
