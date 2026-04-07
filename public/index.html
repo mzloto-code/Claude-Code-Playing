@@ -788,9 +788,9 @@ function renderDinners(){
     const dayName=DAYS[di];
     const isTaco=dinner.id==='taco-tuesday';
     const isPizza=dinner.id==='pizza-friday';
-    const tagHtml=dinner.tags.map(t=>{
-      const cls=t.c==='taco-badge'?'taco-badge':('dd-tag '+t.c);
-      return '<span class="'+cls+'">'+t.l+'</span>';
+    const tagHtml=(dinner.tags||[]).map(t=>{
+      const cls=t.c==='taco-badge'?'taco-badge':('dd-tag '+(t.c||'tag-gray'));
+      return '<span class="'+cls+'">'+(t.l||t)+'</span>';
     }).join('');
     const card=document.createElement('div');
     card.className='dinner-day'+(isTaco?' taco-day':isPizza?' pizza-day':'');
@@ -854,7 +854,7 @@ async function rateRecipe(recipeId,stars){
 async function swapDinner(di,e){
   if(e)e.stopPropagation();
   const currentId=currentDinners[di].id;
-  const usedIds=new Set(currentDinners.filter(d=>!d.locked).map(d=>d.id));
+  const usedIds=new Set(currentDinners.filter(d=>d&&!d.locked).map(d=>d.id));
   const customAsPool=currentCustomRecipes.map(r=>({id:'custom-'+r.id,name:r.name,emoji:r.emoji,tags:r.tags.map(t=>({l:t,c:'tag-gray'})),serves:r.serves,time:r.time,leftoverNote:r.leftover_note,leftoverKeys:[],ingredients:r.ingredients,steps:r.steps}));
   const fullPool=[...dinnerPool,...customAsPool];
   const candidates=shuffle(fullPool.filter(d=>d.id!==currentId&&!usedIds.has(d.id)));
@@ -1047,15 +1047,18 @@ function renderProfiles(){
 
 async function addPref(memberId, catKey){
   const input=document.getElementById('prefinput-'+memberId+'-'+catKey);
-  const val=(input.value||'').trim();
-  if(!val)return;
+  const raw=(input.value||'').trim();
+  if(!raw)return;
+  const vals=raw.split(/[,;]+/).map(v=>v.trim()).filter(Boolean);
   try{
-    const pref=await apiCall('POST','/api/profile/preferences',{member_id:memberId,category:catKey,value:val});
-    const kid=currentKids.find(k=>k.id===memberId);
-    if(kid){if(!kid.preferences)kid.preferences=[];kid.preferences.push(pref);}
+    for(const val of vals){
+      const pref=await apiCall('POST','/api/profile/preferences',{member_id:memberId,category:catKey,value:val});
+      const kid=currentKids.find(k=>k.id===memberId);
+      if(kid){if(!kid.preferences)kid.preferences=[];kid.preferences.push(pref);}
+    }
     input.value='';
     renderProfiles();
-    showToast('Added "'+val+'"');
+    showToast(vals.length>1?'Added '+vals.length+' preferences':'Added "'+vals[0]+'"');
   }catch(e){showToast(e.message);}
 }
 
