@@ -74,9 +74,13 @@ db.exec(`
     tags_json         TEXT DEFAULT '[]',
     ingredients_json  TEXT DEFAULT '[]',
     steps_json        TEXT DEFAULT '[]',
+    source_url        TEXT DEFAULT '',
     created_at        TEXT DEFAULT (datetime('now'))
   );
 `);
+
+// ─── Migrations (safe to run on every start) ──────────────────────────────────
+try { db.exec("ALTER TABLE custom_recipes ADD COLUMN source_url TEXT DEFAULT ''"); } catch(e) { /* column already exists */ }
 
 // ─── Zloto seed data ─────────────────────────────────────────────────────────
 const ZLOTO_SEED = [
@@ -291,13 +295,13 @@ app.get('/api/custom-recipes', requireAuth, (req, res) => {
 });
 
 app.post('/api/custom-recipes', requireAuth, (req, res) => {
-  const { name, emoji, serves, time, leftover_note, tags, ingredients, steps } = req.body;
+  const { name, emoji, serves, time, leftover_note, source_url, tags, ingredients, steps } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
   const result = db.prepare(`
-    INSERT INTO custom_recipes (family_id, name, emoji, serves, time, leftover_note, tags_json, ingredients_json, steps_json)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO custom_recipes (family_id, name, emoji, serves, time, leftover_note, source_url, tags_json, ingredients_json, steps_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(req.familyId, name, emoji || '🍽️', serves || '4', time || '30 min',
-         leftover_note || '', JSON.stringify(tags || []),
+         leftover_note || '', source_url || '', JSON.stringify(tags || []),
          JSON.stringify(ingredients || []), JSON.stringify(steps || []));
   const recipe = db.prepare('SELECT * FROM custom_recipes WHERE id = ?').get(result.lastInsertRowid);
   res.json(parseRecipe(recipe));
@@ -306,12 +310,13 @@ app.post('/api/custom-recipes', requireAuth, (req, res) => {
 app.put('/api/custom-recipes/:id', requireAuth, (req, res) => {
   const recipe = db.prepare('SELECT * FROM custom_recipes WHERE id = ? AND family_id = ?').get(req.params.id, req.familyId);
   if (!recipe) return res.status(404).json({ error: 'Recipe not found' });
-  const { name, emoji, serves, time, leftover_note, tags, ingredients, steps } = req.body;
+  const { name, emoji, serves, time, leftover_note, source_url, tags, ingredients, steps } = req.body;
   db.prepare(`
-    UPDATE custom_recipes SET name=?, emoji=?, serves=?, time=?, leftover_note=?, tags_json=?, ingredients_json=?, steps_json=?
+    UPDATE custom_recipes SET name=?, emoji=?, serves=?, time=?, leftover_note=?, source_url=?, tags_json=?, ingredients_json=?, steps_json=?
     WHERE id=?
   `).run(name || recipe.name, emoji || recipe.emoji, serves || recipe.serves,
          time || recipe.time, leftover_note ?? recipe.leftover_note,
+         source_url ?? recipe.source_url ?? '',
          JSON.stringify(tags || []), JSON.stringify(ingredients || []),
          JSON.stringify(steps || []), req.params.id);
   const updated = db.prepare('SELECT * FROM custom_recipes WHERE id = ?').get(req.params.id);
