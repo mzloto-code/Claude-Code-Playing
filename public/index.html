@@ -219,6 +219,29 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);
 .profile-footer-note{font-size:.72rem;color:var(--muted);}
 .profile-regen-btn{padding:4px 12px;border-radius:20px;border:1px solid var(--mint);background:var(--orange-lt);color:var(--orange-dk);font-size:.72rem;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;}
 .profile-regen-btn:hover{background:#f5d4b8;}
+.admin-wrap{max-width:860px;margin:0 auto;padding:1rem 0;}
+.admin-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;}
+.admin-top h2{font-family:'DM Serif Display',serif;font-size:1.6rem;margin:0;}
+.admin-section-title{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 .75rem;}
+.admin-account-card{background:#fff;border-radius:12px;border:1px solid var(--border);padding:.9rem 1.1rem;margin-bottom:.75rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;}
+.admin-account-card.pending{border-color:var(--orange);background:#fffaf6;}
+.admin-account-card.rejected{border-color:#e0bebe;background:#fff8f8;}
+.admin-acct-info{flex:1;min-width:0;}
+.admin-acct-name{font-weight:600;font-size:.95rem;}
+.admin-acct-meta{font-size:.75rem;color:var(--muted);margin-top:2px;}
+.admin-status-badge{font-size:.65rem;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.06em;}
+.admin-status-badge.pending{background:#fde8cc;color:#a05a00;}
+.admin-status-badge.approved{background:#d6f0e0;color:#1a6b3a;}
+.admin-status-badge.rejected{background:#fde0e0;color:#b00;}
+.admin-actions{display:flex;gap:6px;flex-shrink:0;}
+.admin-btn{padding:5px 14px;border-radius:8px;font-size:.76rem;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;border:none;}
+.admin-btn-approve{background:#d6f0e0;color:#1a6b3a;}
+.admin-btn-approve:hover{background:#b8e8cc;}
+.admin-btn-reject{background:#fde0e0;color:#b00;}
+.admin-btn-reject:hover{background:#facaca;}
+.admin-btn-delete{background:#f0f0f0;color:#555;}
+.admin-btn-delete:hover{background:#e0e0e0;}
+.admin-empty{color:var(--muted);font-size:.85rem;font-style:italic;}
 .profiles-tip{text-align:center;font-size:.78rem;color:var(--muted);margin-top:1.25rem;}
 /* ── Add Member modal ─────────────── */
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:300;align-items:center;justify-content:center;}
@@ -335,6 +358,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);
     <button class="btn btn-tab" id="tab-shop" onclick="switchTab('shop')">🛒 Shopping</button>
     <button class="btn btn-tab" id="tab-recipes" onclick="switchTab('recipes')">🍳 Recipes</button>
     <button class="btn btn-tab" id="tab-profiles" onclick="switchTab('profiles')">👤 Profiles</button>
+    <button class="btn btn-tab" id="tab-admin" onclick="switchTab('admin')" style="display:none;background:var(--orange-lt);color:var(--orange-dk);border-color:var(--orange)">👑 Admin</button>
     <button class="btn btn-green" onclick="sendEmail()">📧 Email Week</button>
     <button class="btn btn-secondary" onclick="copyPlan()">📋 Copy Plan</button>
   </div>
@@ -398,6 +422,24 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);
       </div>
       <div class="profiles-grid" id="profilesGrid"></div>
       <p class="profiles-tip">Changes save automatically · Hit <strong>🔀 New Week</strong> to apply preferences to a new plan</p>
+    </div>
+  </div>
+
+  <!-- ADMIN TAB -->
+  <div class="tab-panel" id="panel-admin">
+    <div class="admin-wrap">
+      <div class="admin-top">
+        <h2>Account Management</h2>
+        <button class="btn btn-secondary" onclick="loadAdminAccounts()">↻ Refresh</button>
+      </div>
+      <div id="adminPendingSection" style="margin-bottom:2rem">
+        <h3 class="admin-section-title">⏳ Pending Approval</h3>
+        <div id="adminPendingList"><p class="admin-empty">No pending accounts.</p></div>
+      </div>
+      <div>
+        <h3 class="admin-section-title">✅ All Accounts</h3>
+        <div id="adminAllList"></div>
+      </div>
     </div>
   </div>
 </div><!-- end #app -->
@@ -505,6 +547,7 @@ let currentRatings = {};  // { [recipeId]: { stars, notes } }
 let flagged        = new Set();
 let accountEmail   = '';
 let accountUsername= '';
+let isAdmin        = false;
 let currentShopTab = 'all';
 
 // ═══════════════════════════════════════
@@ -534,7 +577,8 @@ async function handleLogin(e) {
   e.preventDefault();
   const btn = document.getElementById('loginBtn');
   btn.disabled = true; btn.textContent = 'Signing in…';
-  document.getElementById('loginError').textContent = '';
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
   try {
     const data = await apiCall('POST','/api/auth/login',{
       username: document.getElementById('loginUsername').value.trim(),
@@ -545,7 +589,16 @@ async function handleLogin(e) {
     localStorage.setItem('mealPlannerEmail',    data.email);
     await initApp();
   } catch(err) {
-    document.getElementById('loginError').textContent = err.message;
+    if (err.message === 'pending') {
+      errEl.style.color = '#a05a00';
+      errEl.textContent = '⏳ Your account is awaiting administrator approval.';
+    } else if (err.message === 'rejected') {
+      errEl.style.color = '#b00';
+      errEl.textContent = '❌ Your account request was not approved. Contact the administrator.';
+    } else {
+      errEl.style.color = '';
+      errEl.textContent = err.message;
+    }
   }
   btn.disabled = false; btn.textContent = 'Sign In';
 }
@@ -564,6 +617,13 @@ async function handleRegister(e) {
       email:    document.getElementById('regEmail').value.trim(),
       password: pw
     });
+    if (data.pending) {
+      const errEl = document.getElementById('registerError');
+      errEl.style.color = '#1a6b3a';
+      errEl.textContent = '✅ ' + data.message;
+      btn.disabled = false; btn.textContent = 'Create Account';
+      return;
+    }
     localStorage.setItem('mealPlannerToken',   data.token);
     localStorage.setItem('mealPlannerUsername', data.username);
     localStorage.setItem('mealPlannerEmail',    data.email);
@@ -590,7 +650,9 @@ async function initApp() {
     currentKids    = buildKidsFromMembers(profileData.members);
     accountEmail   = profileData.family.email;
     accountUsername= profileData.family.username;
+    isAdmin        = profileData.family.is_admin === 1;
     document.getElementById('accountUsername').textContent = '👤 ' + accountUsername;
+    document.getElementById('tab-admin').style.display = isAdmin ? '' : 'none';
 
     const [ratingsData] = await Promise.all([
       apiCall('GET', '/api/ratings'),
@@ -1183,6 +1245,80 @@ function switchTab(tab){
   document.getElementById('panel-'+tab).classList.add('active');
   document.getElementById('tab-'+tab).classList.add('active');
   if (tab === 'recipes') renderRecipes();
+  if (tab === 'admin') loadAdminAccounts();
+}
+
+// ═══════════════════════════════════════
+//  ADMIN
+// ═══════════════════════════════════════
+async function loadAdminAccounts() {
+  try {
+    const data = await apiCall('GET', '/api/admin/accounts');
+    const pending = data.accounts.filter(a => a.status === 'pending');
+    const all = data.accounts;
+
+    const pendingEl = document.getElementById('adminPendingList');
+    pendingEl.innerHTML = pending.length
+      ? pending.map(a => adminAccountCard(a, true)).join('')
+      : '<p class="admin-empty">No pending accounts.</p>';
+
+    const allEl = document.getElementById('adminAllList');
+    allEl.innerHTML = all.map(a => adminAccountCard(a, false)).join('');
+  } catch(e) { showToast('Failed to load accounts'); }
+}
+
+function adminAccountCard(a, isPendingSection) {
+  const badge = `<span class="admin-status-badge ${a.status}">${a.status}</span>`;
+  const info = `<div class="admin-acct-info">
+    <div class="admin-acct-name">${escHtml(a.username)} ${a.is_admin ? '👑' : ''} ${badge}</div>
+    <div class="admin-acct-meta">${escHtml(a.email)} · ${a.member_count} member(s) · Joined ${a.created_at.slice(0,10)}</div>
+  </div>`;
+
+  let btns = '';
+  if (!a.is_admin) {
+    if (a.status === 'pending') {
+      btns = `<button class="admin-btn admin-btn-approve" onclick="adminApprove(${a.id})">✅ Approve</button>
+              <button class="admin-btn admin-btn-reject" onclick="adminReject(${a.id})">❌ Reject</button>`;
+    } else if (a.status === 'approved') {
+      btns = `<button class="admin-btn admin-btn-reject" onclick="adminReject(${a.id})">Revoke</button>
+              <button class="admin-btn admin-btn-delete" onclick="adminDelete(${a.id}, '${escHtml(a.username)}')">🗑️ Delete</button>`;
+    } else {
+      btns = `<button class="admin-btn admin-btn-approve" onclick="adminApprove(${a.id})">Re-approve</button>
+              <button class="admin-btn admin-btn-delete" onclick="adminDelete(${a.id}, '${escHtml(a.username)}')">🗑️ Delete</button>`;
+    }
+  }
+
+  return `<div class="admin-account-card ${a.status !== 'approved' ? a.status : ''}">
+    ${info}
+    <div class="admin-actions">${btns}</div>
+  </div>`;
+}
+
+function escHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function adminApprove(id) {
+  try {
+    await apiCall('POST', '/api/admin/accounts/' + id + '/approve');
+    showToast('Account approved!');
+    loadAdminAccounts();
+  } catch(e) { showToast('Failed: ' + e.message); }
+}
+
+async function adminReject(id) {
+  try {
+    await apiCall('POST', '/api/admin/accounts/' + id + '/reject');
+    showToast('Account rejected.');
+    loadAdminAccounts();
+  } catch(e) { showToast('Failed: ' + e.message); }
+}
+
+async function adminDelete(id, username) {
+  if (!confirm('Permanently delete account "' + username + '" and all their data?')) return;
+  try {
+    await apiCall('DELETE', '/api/admin/accounts/' + id);
+    showToast('Account deleted.');
+    loadAdminAccounts();
+  } catch(e) { showToast('Failed: ' + e.message); }
 }
 
 function showToast(msg){

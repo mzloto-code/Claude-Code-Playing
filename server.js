@@ -81,6 +81,12 @@ db.exec(`
 
 // ─── Migrations (safe to run on every start) ──────────────────────────────────
 try { db.exec("ALTER TABLE custom_recipes ADD COLUMN source_url TEXT DEFAULT ''"); } catch(e) { /* column already exists */ }
+try { db.exec("ALTER TABLE families ADD COLUMN status TEXT DEFAULT 'approved'"); } catch(e) { /* column already exists */ }
+try { db.exec("ALTER TABLE families ADD COLUMN is_admin INTEGER DEFAULT 0"); } catch(e) { /* column already exists */ }
+
+// Mark the admin account (existing or future)
+const ADMIN_USERNAME = (process.env.ADMIN_USERNAME || 'zloto').toLowerCase();
+db.prepare("UPDATE families SET is_admin = 1, status = 'approved' WHERE username = ?").run(ADMIN_USERNAME);
 
 // ─── Zloto seed data ─────────────────────────────────────────────────────────
 const ZLOTO_SEED = [
@@ -148,10 +154,16 @@ function requireAuth(req, res, next) {
     req.familyId = payload.familyId;
     req.username = payload.username;
     req.email = payload.email;
+    req.isAdmin = payload.isAdmin || false;
     next();
   } catch {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
+}
+
+function requireAdmin(req, res, next) {
+  if (!req.isAdmin) return res.status(403).json({ error: 'Admin access required' });
+  next();
 }
 
 // ─── Auth routes ──────────────────────────────────────────────────────────────
@@ -167,16 +179,22 @@ app.post('/api/auth/register', async (req, res) => {
   if (existing) return res.status(409).json({ error: 'Username already taken' });
 
   const hash = await bcrypt.hash(password, 10);
-  const result = db.prepare('INSERT INTO families (username, password, email) VALUES (?, ?, ?)').run(username.toLowerCase(), hash, email);
+  const isAdminAccount = username.toLowerCase() === ADMIN_USERNAME;
+  const status = isAdminAccount ? 'approved' : 'pending';
+  const isAdminFlag = isAdminAccount ? 1 : 0;
+  const result = db.prepare(
+    'INSERT INTO families (username, password, email, status, is_admin) VALUES (?, ?, ?, ?, ?)'
+  ).run(username.toLowerCase(), hash, email, status, isAdminFlag);
   const familyId = result.lastInsertRowid;
 
-  // Seed Zloto family data for the "zloto" account
-  if (username.toLowerCase() === 'zloto') {
-    seedZlotoFamily(familyId);
+  if (isAdminAccount) seedZlotoFamily(familyId);
+
+  if (!isAdminAccount) {
+    return res.json({ pending: true, message: 'Account created! An administrator will review and approve it shortly.' });
   }
 
-  const token = jwt.sign({ familyId, username: username.toLowerCase(), email }, JWT_SECRET, { expiresIn: '30d' });
-  res.json({ token, username: username.toLowerCase(), email });
+  const token = jwt.sign({ familyId, username: username.toLowerCase(), email, isAdmin: true }, JWT_SECRET, { expiresIn: '30d' });
+  res.json({ token, username: username.toLowerCase(), email, isAdmin: true });
 });
 
 app.post('/api/auth/login', async (req, res) => {
@@ -189,15 +207,23 @@ app.post('/api/auth/login', async (req, res) => {
   const valid = await bcrypt.compare(password, family.password);
   if (!valid) return res.status(401).json({ error: 'Invalid username or password' });
 
-  const token = jwt.sign({ familyId: family.id, username: family.username, email: family.email }, JWT_SECRET, { expiresIn: '30d' });
-  res.json({ token, username: family.username, email: family.email });
+  if (family.status === 'pending') {
+    return res.status(403).json({ error: 'pending', message: 'Your account is awaiting administrator approval.' });
+  }
+  if (family.status === 'rejected') {
+    return res.status(403).json({ error: 'rejected', message: 'Your account request was not approved. Contact the administrator.' });
+  }
+
+  const isAdmin = family.is_admin === 1;
+  const token = jwt.sign({ familyId: family.id, username: family.username, email: family.email, isAdmin }, JWT_SECRET, { expiresIn: '30d' });
+  res.json({ token, username: family.username, email: family.email, isAdmin });
 });
 
 // ─── Profile routes ───────────────────────────────────────────────────────────
 app.get('/api/profile', requireAuth, (req, res) => {
   const members = db.prepare('SELECT * FROM members WHERE family_id = ? ORDER BY sort_order, id').all(req.familyId);
   const prefs = db.prepare('SELECT * FROM preferences WHERE member_id IN (SELECT id FROM members WHERE family_id = ?)').all(req.familyId);
-  const family = db.prepare('SELECT username, email FROM families WHERE id = ?').get(req.familyId);
+  const family = db.prepare('SELECT username, email, is_admin FROM families WHERE id = ?').get(req.familyId);
 
   // Attach prefs to each member
   const membersWithPrefs = members.map(m => ({
@@ -437,6 +463,38 @@ app.delete('/api/custom-recipes/:id', requireAuth, (req, res) => {
 function parseRecipe(r) {
   return { ...r, tags: JSON.parse(r.tags_json || '[]'), ingredients: JSON.parse(r.ingredients_json || '[]'), steps: JSON.parse(r.steps_json || '[]') };
 }
+
+// ─── Admin routes ─────────────────────────────────────────────────────────────
+app.get('/api/admin/accounts', requireAuth, requireAdmin, (req, res) => {
+  const accounts = db.prepare(
+    `SELECT id, username, email, status, is_admin,
+            (SELECT COUNT(*) FROM members WHERE family_id = families.id) AS member_count,
+            created_at
+     FROM families ORDER BY CASE status WHEN 'pending' THEN 0 ELSE 1 END, created_at DESC`
+  ).all();
+  res.json({ accounts });
+});
+
+app.post('/api/admin/accounts/:id/approve', requireAuth, requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id);
+  if (id === req.familyId) return res.status(400).json({ error: 'Cannot modify your own account' });
+  db.prepare("UPDATE families SET status = 'approved' WHERE id = ?").run(id);
+  res.json({ ok: true });
+});
+
+app.post('/api/admin/accounts/:id/reject', requireAuth, requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id);
+  if (id === req.familyId) return res.status(400).json({ error: 'Cannot modify your own account' });
+  db.prepare("UPDATE families SET status = 'rejected' WHERE id = ? AND is_admin = 0").run(id);
+  res.json({ ok: true });
+});
+
+app.delete('/api/admin/accounts/:id', requireAuth, requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id);
+  if (id === req.familyId) return res.status(400).json({ error: 'Cannot delete your own account' });
+  db.prepare('DELETE FROM families WHERE id = ? AND is_admin = 0').run(id);
+  res.json({ ok: true });
+});
 
 // ─── Start server ─────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
