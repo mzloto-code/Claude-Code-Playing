@@ -83,6 +83,7 @@ db.exec(`
 try { db.exec("ALTER TABLE custom_recipes ADD COLUMN source_url TEXT DEFAULT ''"); } catch(e) { /* column already exists */ }
 try { db.exec("ALTER TABLE families ADD COLUMN status TEXT DEFAULT 'approved'"); } catch(e) { /* column already exists */ }
 try { db.exec("ALTER TABLE families ADD COLUMN is_admin INTEGER DEFAULT 0"); } catch(e) { /* column already exists */ }
+try { db.exec("ALTER TABLE families ADD COLUMN settings_json TEXT DEFAULT '{}'"); } catch(e) { /* column already exists */ }
 
 // Mark the admin account (existing or future)
 const ADMIN_USERNAME = (process.env.ADMIN_USERNAME || 'zloto').toLowerCase();
@@ -463,6 +464,21 @@ app.delete('/api/custom-recipes/:id', requireAuth, (req, res) => {
 function parseRecipe(r) {
   return { ...r, tags: JSON.parse(r.tags_json || '[]'), ingredients: JSON.parse(r.ingredients_json || '[]'), steps: JSON.parse(r.steps_json || '[]') };
 }
+
+// ─── Settings routes ──────────────────────────────────────────────────────────
+app.get('/api/settings', requireAuth, (req, res) => {
+  const family = db.prepare('SELECT settings_json FROM families WHERE id = ?').get(req.familyId);
+  let settings = {};
+  try { settings = JSON.parse(family.settings_json || '{}'); } catch(e) {}
+  res.json({ settings });
+});
+
+app.put('/api/settings', requireAuth, (req, res) => {
+  const { settings } = req.body;
+  if (!settings || typeof settings !== 'object') return res.status(400).json({ error: 'settings object required' });
+  db.prepare('UPDATE families SET settings_json = ? WHERE id = ?').run(JSON.stringify(settings), req.familyId);
+  res.json({ ok: true });
+});
 
 // ─── Admin routes ─────────────────────────────────────────────────────────────
 app.get('/api/admin/accounts', requireAuth, requireAdmin, (req, res) => {

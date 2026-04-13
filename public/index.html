@@ -123,6 +123,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);
 .dd-btn-swap{flex:1;padding:5px 0;border-radius:8px;border:1px solid var(--orange);background:var(--orange-lt);font-size:.72rem;font-weight:500;color:var(--orange-dk);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s;}
 .dd-btn-swap:hover{background:#f5d4b8;}
 .taco-locked-note{padding:.45rem .9rem .55rem;font-size:.68rem;color:var(--taco-text);background:var(--taco);text-align:center;border-top:1px solid var(--taco-border);}
+/* ── Tradition toggles ───────────── */
+.tradition-toggles{max-width:420px;margin:1.5rem auto 0;background:#fff;border:1px solid var(--border);border-radius:12px;padding:1rem 1.2rem;}
+.tradition-header{font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.65rem;}
+.tradition-toggle-row{display:flex;align-items:center;gap:.55rem;font-size:.85rem;color:var(--text);cursor:pointer;padding:.3rem 0;user-select:none;}
+.tradition-toggle-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--orange);cursor:pointer;}
 /* ── Star ratings ────────────────── */
 .rating-widget{display:flex;align-items:center;gap:3px;padding:.35rem .9rem .4rem;border-top:1px solid var(--border2);}
 .star{font-size:1rem;cursor:pointer;color:#d1ccc4;transition:color .1s;line-height:1;user-select:none;}
@@ -382,6 +387,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);
     <div class="dinner-wrap">
       <div class="dinner-week" id="dinnerWeek"></div>
       <p style="text-align:center;font-size:.8rem;color:var(--muted);margin-top:-.5rem;">Click any dinner card to see the full recipe · Rate dinners with ⭐ stars</p>
+      <div class="tradition-toggles" id="traditionToggles">
+        <div class="tradition-header">Family Traditions</div>
+        <label class="tradition-toggle-row">
+          <input type="checkbox" id="toggleTaco" onchange="setTraditionLock('taco', this.checked)">
+          <span>🌮 Lock Taco Tuesday (always Taco Tuesday)</span>
+        </label>
+        <label class="tradition-toggle-row">
+          <input type="checkbox" id="togglePizza" onchange="setTraditionLock('pizza', this.checked)">
+          <span>🍕 Lock Pizza Friday (always Pizza Friday)</span>
+        </label>
+      </div>
     </div>
   </div>
 
@@ -548,6 +564,7 @@ let flagged        = new Set();
 let accountEmail   = '';
 let accountUsername= '';
 let isAdmin        = false;
+let familySettings = { tacoLocked: true, pizzaLocked: true };
 let currentShopTab = 'all';
 
 // ═══════════════════════════════════════
@@ -654,10 +671,12 @@ async function initApp() {
     document.getElementById('accountUsername').textContent = '👤 ' + accountUsername;
     document.getElementById('tab-admin').style.display = isAdmin ? '' : 'none';
 
-    const [ratingsData] = await Promise.all([
+    const [ratingsData, settingsData] = await Promise.all([
       apiCall('GET', '/api/ratings'),
+      apiCall('GET', '/api/settings'),
       loadCustomRecipes()
     ]);
+    familySettings = Object.assign({ tacoLocked: true, pizzaLocked: true }, settingsData.settings || {});
     currentRatings = {};
     ratingsData.ratings.forEach(r => { currentRatings[r.recipe_id] = r; });
 
@@ -677,6 +696,7 @@ async function initApp() {
     document.getElementById('app').style.display = 'block';
     renderGrid();
     renderDinners();
+    renderTraditionToggles();
     renderShop();
     renderProfiles();
   } catch(err) {
@@ -715,7 +735,53 @@ function getWeekLabel() {
   return 'Week of '+mon.toLocaleDateString('en-US',o)+' – '+fri.toLocaleDateString('en-US',o);
 }
 function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}return b;}
-function pickLunches(pool){const s=shuffle(pool);return Array.from({length:5},(_,i)=>JSON.parse(JSON.stringify(s[i%s.length])));}
+
+// Fallbacks used by ensureLunchBalance when a slot is genuinely missing
+const LUNCH_BALANCE_FALLBACKS = {
+  protein: {text:'Hard-boiled egg',cat:'protein',emoji:'🥚'},
+  carb:    {text:'Whole-grain crackers',cat:'carb',emoji:'🍘'},
+  dairy:   {text:'String cheese',cat:'dairy',emoji:'🧀'},
+};
+
+function ensureLunchBalance(lunch) {
+  // Protein: main.cat==='protein' OR explicit protein slot OR extra.cat==='protein'
+  const hasProtein = (lunch.main&&lunch.main.cat==='protein') || lunch.protein || (lunch.extra&&lunch.extra.cat==='protein');
+  if (!hasProtein) lunch.protein = {...LUNCH_BALANCE_FALLBACKS.protein};
+  // Carb: main.cat==='carb' OR explicit carb slot
+  const hasCarb = (lunch.main&&lunch.main.cat==='carb') || lunch.carb;
+  if (!hasCarb) lunch.carb = {...LUNCH_BALANCE_FALLBACKS.carb};
+  // Dairy/fat: dairy slot OR extra slot OR protein-heavy main already provides enough
+  const hasDairy = lunch.dairy || (lunch.extra&&(lunch.extra.cat==='protein'||lunch.extra.cat==='dairy'));
+  if (!hasDairy) lunch.dairy = {...LUNCH_BALANCE_FALLBACKS.dairy};
+  return lunch;
+}
+
+function pickLunches(pool) {
+  if (!pool || !pool.length) return [];
+  // Pick 5 unique lunches (wrap if pool < 5)
+  const s = shuffle(pool);
+  const picked = Array.from({length:5}, (_,i) => JSON.parse(JSON.stringify(s[i % s.length])));
+  // Collect unique fruits and veggies from the picked set, then constrain to 2 each
+  const seen = new Set();
+  const uniqFruits = picked.filter(l=>l.fruit).reduce((acc,l)=>{
+    if(!seen.has(l.fruit.text)){seen.add(l.fruit.text);acc.push(l.fruit);}
+    return acc;
+  },[]);
+  const seen2 = new Set();
+  const uniqVegs = picked.filter(l=>l.veg).reduce((acc,l)=>{
+    if(!seen2.has(l.veg.text)){seen2.add(l.veg.text);acc.push(l.veg);}
+    return acc;
+  },[]);
+  // Weekly palette: 2 fruits, 2 veggies — rotate across 5 days
+  const weekFruits = shuffle(uniqFruits).slice(0,2);
+  const weekVegs   = shuffle(uniqVegs).slice(0,2);
+  return picked.map((lunch,i) => {
+    if (weekFruits.length) lunch.fruit = {...weekFruits[i % weekFruits.length]};
+    if (weekVegs.length)   lunch.veg   = {...weekVegs[i % weekVegs.length]};
+    ensureLunchBalance(lunch);
+    return lunch;
+  });
+}
 function buildItems(lunch){return['main','carb','protein','dairy','veg','fruit','extra'].filter(k=>lunch[k]).map(k=>({...lunch[k],_key:k}));}
 
 // ═══════════════════════════════════════
@@ -752,8 +818,20 @@ function generateMenuData() {
   currentKids.forEach(kid => {
     currentMenu[kid.id] = pickLunches(kid.lunches);
   });
-  const pool = shuffle(dinnerPool.filter(d=>!d.locked));
-  currentDinners = [pool[0], tacoTuesdayDinner, pool[1], pool[2], pizzaFridayDinner];
+  const tacoLocked  = familySettings.tacoLocked  !== false;
+  const pizzaLocked = familySettings.pizzaLocked !== false;
+  const slotsNeeded = 3 + (tacoLocked ? 0 : 1) + (pizzaLocked ? 0 : 1);
+  let pool = shuffle(dinnerPool.filter(d => !d.locked));
+  // Ensure enough pool items
+  while (pool.length < slotsNeeded) pool = pool.concat(shuffle(dinnerPool.filter(d => !d.locked)));
+  let pi = 0;
+  currentDinners = [
+    pool[pi++],
+    tacoLocked  ? tacoTuesdayDinner : pool[pi++],
+    pool[pi++],
+    pool[pi++],
+    pizzaLocked ? pizzaFridayDinner : pool[pi++],
+  ];
 }
 
 async function generateAll() {
@@ -859,15 +937,30 @@ function renderDinners(){
     const topHtml='<div class="dd-top"><div class="dd-dayname">'+dayName+'</div><div class="dd-meal">'+dinner.emoji+' '+dinner.name+'</div><div class="dd-tags">'+tagHtml+'<span class="dd-tag tag-gray">'+dinner.time+'</span><span class="serves-pill">Serves '+dinner.serves+'</span></div></div>';
     const lfHtml='<div class="dd-lf"><strong>'+(isPizza?'🍕 No leftovers — just enjoy!':'⭐ Leftovers into lunches:')+'</strong> '+dinner.leftoverNote+'</div>';
     const ratingHtml=buildRatingWidget(dinner.id);
-    if(isTaco){
+    if(isTaco && familySettings.tacoLocked!==false){
       card.innerHTML=topHtml+ratingHtml+lfHtml+'<div class="taco-locked-note">🌮 Taco Tuesday is sacred!</div><div class="dd-actions"><button class="dd-btn-recipe" onclick="openRecipe(\'taco-tuesday\')">📖 View Recipe</button></div>';
-    } else if(isPizza){
+    } else if(isPizza && familySettings.pizzaLocked!==false){
       card.innerHTML=topHtml+ratingHtml+lfHtml+'<div class="pizza-locked-note">🍕 Pizza Friday is sacred!</div><div class="dd-actions"><button class="dd-btn-recipe" onclick="openRecipe(\'pizza-friday\')">📖 View Recipe</button></div>';
     } else {
       card.innerHTML=topHtml+ratingHtml+lfHtml+'<div class="dd-actions"><button class="dd-btn-recipe" onclick="openRecipe(\''+dinner.id+'\')">📖 View Recipe</button><button class="dd-btn-swap" onclick="swapDinner('+di+',event)">🔀 Change Dinner</button></div>';
     }
     wrap.appendChild(card);
   });
+}
+
+function renderTraditionToggles(){
+  const tacoEl  = document.getElementById('toggleTaco');
+  const pizzaEl = document.getElementById('togglePizza');
+  if(tacoEl)  tacoEl.checked  = familySettings.tacoLocked  !== false;
+  if(pizzaEl) pizzaEl.checked = familySettings.pizzaLocked !== false;
+}
+
+async function setTraditionLock(which, locked){
+  if(which==='taco')  familySettings.tacoLocked  = locked;
+  if(which==='pizza') familySettings.pizzaLocked = locked;
+  try { await apiCall('PUT','/api/settings',{settings: familySettings}); } catch(e){}
+  renderDinners();
+  showToast(locked ? (which==='taco'?'🌮 Taco Tuesday locked!':'🍕 Pizza Friday locked!') : (which==='taco'?'🌮 Taco Tuesday unlocked — you can swap it now!':'🍕 Pizza Friday unlocked — you can swap it now!'));
 }
 
 function buildRatingWidget(recipeId){
