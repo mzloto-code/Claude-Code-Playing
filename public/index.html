@@ -736,23 +736,49 @@ function getWeekLabel() {
 }
 function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}return b;}
 
-// Fallbacks used by ensureLunchBalance when a slot is genuinely missing
-const LUNCH_BALANCE_FALLBACKS = {
-  protein: {text:'Hard-boiled egg',cat:'protein',emoji:'🥚'},
-  carb:    {text:'Whole-grain crackers',cat:'carb',emoji:'🍘'},
-  dairy:   {text:'String cheese',cat:'dairy',emoji:'🧀'},
-};
+// Build a library of slot items sourced from the kid's own lunch pool,
+// deduped by text. Used by ensureLunchBalance to pick contextually appropriate
+// fallbacks rather than hardcoded defaults.
+function buildPoolLibrary(pool) {
+  const lib = { protein: [], carb: [], dairy: [] };
+  pool.forEach(l => {
+    ['protein','carb','dairy'].forEach(k => {
+      if (l[k] && !lib[k].some(x => x.text === l[k].text)) lib[k].push(l[k]);
+    });
+    // Mains whose category matches a slot can also serve as inspiration
+    if (l.main && lib[l.main.cat] && !lib[l.main.cat].some(x => x.text === l.main.text)) {
+      lib[l.main.cat].push(l.main);
+    }
+  });
+  return lib;
+}
 
-function ensureLunchBalance(lunch) {
-  // Protein: main.cat==='protein' OR explicit protein slot OR extra.cat==='protein'
+// Fills missing protein / carb / dairy slots using items the kid already eats.
+// usedFallbacks tracks what has been picked this week so each day stays fresh.
+function ensureLunchBalance(lunch, library, usedFallbacks) {
+  function pickFrom(cat) {
+    const used = usedFallbacks[cat];
+    const mainText = lunch.main ? lunch.main.text : '';
+    // Prefer options not yet used this week and not the same as the main
+    let pool = library[cat].filter(x => x.text !== mainText && !used.has(x.text));
+    if (!pool.length) pool = library[cat].filter(x => x.text !== mainText);
+    if (!pool.length) pool = library[cat];
+    if (!pool.length) return null;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    used.add(pick.text);
+    return {...pick};
+  }
+
   const hasProtein = (lunch.main&&lunch.main.cat==='protein') || lunch.protein || (lunch.extra&&lunch.extra.cat==='protein');
-  if (!hasProtein) lunch.protein = {...LUNCH_BALANCE_FALLBACKS.protein};
-  // Carb: main.cat==='carb' OR explicit carb slot
-  const hasCarb = (lunch.main&&lunch.main.cat==='carb') || lunch.carb;
-  if (!hasCarb) lunch.carb = {...LUNCH_BALANCE_FALLBACKS.carb};
-  // Dairy/fat: dairy slot OR extra slot OR protein-heavy main already provides enough
+  if (!hasProtein) { const p = pickFrom('protein'); if (p) lunch.protein = p; }
+
+  // Carbs: treat dairy mains (mac&cheese, quesadilla) as carb-sufficient too
+  const hasCarb = (lunch.main&&['carb','dairy'].includes(lunch.main.cat)) || lunch.carb;
+  if (!hasCarb) { const c = pickFrom('carb'); if (c) lunch.carb = c; }
+
   const hasDairy = lunch.dairy || (lunch.extra&&(lunch.extra.cat==='protein'||lunch.extra.cat==='dairy'));
-  if (!hasDairy) lunch.dairy = {...LUNCH_BALANCE_FALLBACKS.dairy};
+  if (!hasDairy) { const d = pickFrom('dairy'); if (d) lunch.dairy = d; }
+
   return lunch;
 }
 
@@ -775,10 +801,13 @@ function pickLunches(pool) {
   // Weekly palette: 2 fruits, 2 veggies — rotate across 5 days
   const weekFruits = shuffle(uniqFruits).slice(0,2);
   const weekVegs   = shuffle(uniqVegs).slice(0,2);
+  // Build fallback library once from this kid's pool, track used items per category
+  const library = buildPoolLibrary(pool);
+  const usedFallbacks = { protein: new Set(), carb: new Set(), dairy: new Set() };
   return picked.map((lunch,i) => {
     if (weekFruits.length) lunch.fruit = {...weekFruits[i % weekFruits.length]};
     if (weekVegs.length)   lunch.veg   = {...weekVegs[i % weekVegs.length]};
-    ensureLunchBalance(lunch);
+    ensureLunchBalance(lunch, library, usedFallbacks);
     return lunch;
   });
 }
