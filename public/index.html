@@ -622,6 +622,7 @@ async function handleLogin(e) {
     localStorage.setItem('mealPlannerToken',   data.token);
     localStorage.setItem('mealPlannerUsername', data.username);
     localStorage.setItem('mealPlannerEmail',    data.email);
+    localStorage.setItem('mealPlannerSavedUser', data.username);
     await initApp();
   } catch(err) {
     if (err.message === 'pending') {
@@ -673,6 +674,7 @@ function handleLogout() {
   localStorage.removeItem('mealPlannerToken');
   localStorage.removeItem('mealPlannerUsername');
   localStorage.removeItem('mealPlannerEmail');
+  // mealPlannerSavedUser intentionally kept so the login form pre-fills on return
   location.reload();
 }
 
@@ -2040,6 +2042,13 @@ document.addEventListener('DOMContentLoaded', () => {
     initApp();
   } else {
     document.getElementById('loginOverlay').style.display = 'flex';
+    // Pre-fill username if we remember it from a previous session
+    const savedUser = localStorage.getItem('mealPlannerSavedUser');
+    if (savedUser) {
+      const userField = document.getElementById('loginUsername');
+      userField.value = savedUser;
+      document.getElementById('loginPassword').focus();
+    }
   }
 });
 </script>
