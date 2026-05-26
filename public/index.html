@@ -123,31 +123,24 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);
 .dd-btn-swap{flex:1;padding:5px 0;border-radius:8px;border:1px solid var(--orange);background:var(--orange-lt);font-size:.72rem;font-weight:500;color:var(--orange-dk);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s;}
 .dd-btn-swap:hover{background:#f5d4b8;}
 .taco-locked-note{padding:.45rem .9rem .55rem;font-size:.68rem;color:var(--taco-text);background:var(--taco);text-align:center;border-top:1px solid var(--taco-border);}
-/* ── Dinner search ───────────────── */
-.dinner-search-wrap{position:relative;max-width:560px;margin:0 auto 1.5rem;}
-.dinner-search-bar{display:flex;align-items:center;background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:0 .8rem;gap:.5rem;transition:border-color .15s;}
-.dinner-search-bar:focus-within{border-color:var(--orange);box-shadow:0 0 0 3px rgba(234,131,58,.1);}
-.dinner-search-icon{font-size:1rem;color:var(--muted);flex-shrink:0;}
-.dinner-search-bar input{flex:1;border:none;outline:none;padding:.7rem 0;font-size:.9rem;font-family:'DM Sans',sans-serif;background:transparent;color:var(--text);}
-.dinner-search-bar input::placeholder{color:var(--muted);}
-.dinner-search-clear{border:none;background:none;cursor:pointer;color:var(--muted);font-size:.9rem;padding:0;line-height:1;flex-shrink:0;}
-.dinner-search-results{position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.11);z-index:50;overflow:hidden;max-height:380px;overflow-y:auto;}
-.dsr-item{display:flex;align-items:center;gap:.7rem;padding:.6rem .9rem;cursor:pointer;border-bottom:1px solid var(--border2);transition:background .1s;}
+/* ── Dinner search (per-card) ────── */
+.dsr-item{display:flex;align-items:center;gap:.6rem;padding:.45rem .7rem;cursor:pointer;border-bottom:1px solid var(--border2);transition:background .1s;}
 .dsr-item:last-child{border-bottom:none;}
 .dsr-item:hover,.dsr-item.dsr-active{background:var(--tag);}
-.dsr-emoji{font-size:1.35rem;flex-shrink:0;width:2rem;text-align:center;}
+.dsr-emoji{font-size:1.2rem;flex-shrink:0;width:1.8rem;text-align:center;}
 .dsr-info{flex:1;min-width:0;}
-.dsr-name{font-size:.87rem;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.dsr-meta{font-size:.68rem;color:var(--muted);margin-top:1px;}
-.dsr-day-picker{padding:.8rem 1rem;background:#fafaf8;}
-.dsr-day-label{font-size:.75rem;font-weight:600;color:var(--muted);margin-bottom:.5rem;}
-.dsr-day-btns{display:flex;gap:.4rem;flex-wrap:wrap;}
-.dsr-day-btn{padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:.78rem;font-weight:500;color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s;display:flex;flex-direction:column;align-items:center;gap:1px;}
-.dsr-day-btn:hover{background:var(--orange-lt);border-color:var(--orange);color:var(--orange-dk);}
-.dsr-day-current{font-size:.58rem;opacity:.65;max-width:72px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.dsr-no-match{padding:.65rem 1rem;font-size:.85rem;color:var(--muted);}
-.dsr-web{display:flex;align-items:center;gap:.6rem;padding:.65rem 1rem;color:var(--mint);font-size:.83rem;font-weight:500;text-decoration:none;border-top:1px solid var(--border2);cursor:pointer;}
+.dsr-name{font-size:.8rem;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dsr-meta{font-size:.63rem;color:var(--muted);margin-top:1px;}
+.dsr-no-match{padding:.5rem .7rem;font-size:.78rem;color:var(--muted);}
+.dsr-web{display:flex;align-items:center;gap:.5rem;padding:.45rem .7rem;color:var(--mint);font-size:.76rem;font-weight:500;text-decoration:none;border-top:1px solid var(--border2);}
 .dsr-web:hover{background:var(--tag);}
+.dd-search-inline{border-top:1px solid var(--border2);padding:.5rem .7rem .55rem;}
+.dd-search-inline input{width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:.4rem .6rem;font-size:.8rem;font-family:'DM Sans',sans-serif;outline:none;background:#fff;}
+.dd-search-inline input:focus{border-color:var(--orange);}
+.dd-search-list{margin-top:.4rem;border:1px solid var(--border);border-radius:8px;overflow:hidden;max-height:220px;overflow-y:auto;}
+.dd-btn-find{flex:1;padding:5px 0;border-radius:8px;border:1px solid var(--mint);background:#e8f8f4;font-size:.72rem;font-weight:500;color:#0d7a5e;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s;}
+.dd-btn-find:hover{background:#c8f0e4;}
+.dd-btn-find.active{background:var(--mint);color:#fff;border-color:var(--mint);}
 /* ── Tradition toggles ───────────── */
 .tradition-toggles{max-width:420px;margin:1.5rem auto 0;background:#fff;border:1px solid var(--border);border-radius:12px;padding:1rem 1.2rem;}
 .tradition-header{font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.65rem;}
@@ -410,14 +403,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);
   <!-- DINNER TAB -->
   <div class="tab-panel" id="panel-dinner">
     <div class="dinner-wrap">
-      <div class="dinner-search-wrap" id="dinnerSearchWrap">
-        <div class="dinner-search-bar">
-          <span class="dinner-search-icon">🔍</span>
-          <input type="text" id="dinnerSearchInput" placeholder="Search dinners or paste a recipe URL…" autocomplete="off" oninput="onDinnerSearch()" onkeydown="onDinnerSearchKey(event)">
-          <button class="dinner-search-clear" id="dinnerSearchClear" onclick="clearDinnerSearch()" style="display:none">✕</button>
-        </div>
-        <div class="dinner-search-results" id="dinnerSearchResults" style="display:none"></div>
-      </div>
       <div class="dinner-week" id="dinnerWeek"></div>
       <p style="text-align:center;font-size:.8rem;color:var(--muted);margin-top:-.5rem;">Click any dinner card to see the full recipe · Rate dinners with ⭐ stars</p>
       <div class="tradition-toggles" id="traditionToggles">
@@ -996,15 +981,17 @@ function renderDinners(){
     }).join('');
     const card=document.createElement('div');
     card.className='dinner-day'+(isTaco?' taco-day':isPizza?' pizza-day':'');
+    card.dataset.di=di;
     const topHtml='<div class="dd-top"><div class="dd-dayname">'+dayName+'</div><div class="dd-meal">'+dinner.emoji+' '+dinner.name+'</div><div class="dd-tags">'+tagHtml+'<span class="dd-tag tag-gray">'+dinner.time+'</span><span class="serves-pill">Serves '+dinner.serves+'</span></div></div>';
     const lfHtml='<div class="dd-lf"><strong>'+(isPizza?'🍕 No leftovers — just enjoy!':'⭐ Leftovers into lunches:')+'</strong> '+dinner.leftoverNote+'</div>';
     const ratingHtml=buildRatingWidget(dinner.id);
+    const searchHtml='<div class="dd-search-inline" style="display:none"><input type="text" placeholder="Search dinners…" autocomplete="off" oninput="onDaySearch('+di+',this)" onkeydown="onDaySearchKey('+di+',event)"><div class="dd-search-list" style="display:none"></div></div>';
     if(isTaco && familySettings.tacoLocked!==false){
       card.innerHTML=topHtml+ratingHtml+lfHtml+'<div class="taco-locked-note">🌮 Taco Tuesday is sacred!</div><div class="dd-actions"><button class="dd-btn-recipe" onclick="openRecipe(\'taco-tuesday\')">📖 View Recipe</button></div>';
     } else if(isPizza && familySettings.pizzaLocked!==false){
       card.innerHTML=topHtml+ratingHtml+lfHtml+'<div class="pizza-locked-note">🍕 Pizza Friday is sacred!</div><div class="dd-actions"><button class="dd-btn-recipe" onclick="openRecipe(\'pizza-friday\')">📖 View Recipe</button></div>';
     } else {
-      card.innerHTML=topHtml+ratingHtml+lfHtml+'<div class="dd-actions"><button class="dd-btn-recipe" onclick="openRecipe(\''+dinner.id+'\')">📖 View Recipe</button><button class="dd-btn-swap" onclick="swapDinner('+di+',event)">🔀 Change Dinner</button></div>';
+      card.innerHTML=topHtml+ratingHtml+lfHtml+'<div class="dd-actions"><button class="dd-btn-recipe" onclick="openRecipe(\''+dinner.id+'\')">📖 View Recipe</button><button class="dd-btn-swap" onclick="swapDinner('+di+',event)">🔀 Swap</button><button class="dd-btn-find" id="dd-find-btn-'+di+'" onclick="toggleDaySearch('+di+',event)">🔍 Find</button></div>'+searchHtml;
     }
     wrap.appendChild(card);
   });
@@ -1026,11 +1013,11 @@ async function setTraditionLock(which, locked){
 }
 
 // ═══════════════════════════════════════
-//  DINNER SEARCH
+//  DINNER SEARCH (per-day)
 // ═══════════════════════════════════════
-let _dsTimer = null;
-let _dsMatches = [];
-let _dsPending = null;
+let _dsTimers = {};
+let _dsMatches = {};  // keyed by day index
+let _dsActiveDay = -1;
 
 function _buildSearchPool() {
   const customAsPool = currentCustomRecipes.map(r => ({
@@ -1043,125 +1030,134 @@ function _buildSearchPool() {
   return [...dinnerPool, tacoTuesdayDinner, pizzaFridayDinner, ...customAsPool].filter(Boolean);
 }
 
-function onDinnerSearch() {
-  const q = document.getElementById('dinnerSearchInput').value;
-  document.getElementById('dinnerSearchClear').style.display = q ? '' : 'none';
-  clearTimeout(_dsTimer);
-  _dsTimer = setTimeout(() => _renderDinnerSearch(q.trim()), 130);
+function _getCardEl(di) {
+  return document.querySelector('.dinner-day[data-di="'+di+'"]');
 }
 
-function onDinnerSearchKey(e) {
-  const items = document.querySelectorAll('#dinnerSearchResults .dsr-item');
-  if (!items.length) return;
+function toggleDaySearch(di, e) {
+  if(e) e.stopPropagation();
+  const isOpen = _dsActiveDay === di;
+  closeDaySearch();
+  if (!isOpen) openDaySearch(di);
+}
+
+function openDaySearch(di) {
+  _dsActiveDay = di;
+  const card = _getCardEl(di);
+  if (!card) return;
+  const inline = card.querySelector('.dd-search-inline');
+  if (!inline) return;
+  inline.style.display = '';
+  const input = inline.querySelector('input');
+  if (input) { input.value = ''; input.focus(); }
+  const listEl = inline.querySelector('.dd-search-list');
+  if (listEl) listEl.style.display = 'none';
+  const btn = document.getElementById('dd-find-btn-'+di);
+  if (btn) btn.classList.add('active');
+}
+
+function closeDaySearch() {
+  if (_dsActiveDay < 0) return;
+  const card = _getCardEl(_dsActiveDay);
+  if (card) {
+    const inline = card.querySelector('.dd-search-inline');
+    if (inline) inline.style.display = 'none';
+  }
+  const btn = document.getElementById('dd-find-btn-'+_dsActiveDay);
+  if (btn) btn.classList.remove('active');
+  _dsActiveDay = -1;
+}
+
+function onDaySearch(di, input) {
+  clearTimeout(_dsTimers[di]);
+  _dsTimers[di] = setTimeout(() => _renderDayResults(di, input), 140);
+}
+
+function onDaySearchKey(di, e) {
+  const card = _getCardEl(di);
+  if (!card) return;
+  const items = card.querySelectorAll('.dsr-item');
   let idx = [...items].findIndex(el => el.classList.contains('dsr-active'));
   if (e.key === 'ArrowDown') { idx = Math.min(idx+1, items.length-1); }
   else if (e.key === 'ArrowUp') { idx = Math.max(idx-1, 0); }
   else if (e.key === 'Enter' && idx >= 0) { items[idx].click(); e.preventDefault(); return; }
-  else if (e.key === 'Escape') { clearDinnerSearch(); return; }
+  else if (e.key === 'Escape') { closeDaySearch(); return; }
   else return;
   items.forEach((el,i) => el.classList.toggle('dsr-active', i === idx));
   e.preventDefault();
 }
 
-function clearDinnerSearch() {
-  document.getElementById('dinnerSearchInput').value = '';
-  document.getElementById('dinnerSearchClear').style.display = 'none';
-  document.getElementById('dinnerSearchResults').style.display = 'none';
-  _dsMatches = []; _dsPending = null;
-}
+function _renderDayResults(di, input) {
+  const q = input.value.trim();
+  const card = _getCardEl(di);
+  if (!card) return;
+  const listEl = card.querySelector('.dd-search-list');
+  if (!q) { listEl.style.display = 'none'; return; }
 
-function _renderDinnerSearch(q) {
-  const el = document.getElementById('dinnerSearchResults');
-  if (!q) { el.style.display = 'none'; return; }
-  _dsPending = null;
-
-  // Detect pasted URL
   let isUrl = false;
   try { const u = new URL(q); isUrl = u.protocol.startsWith('http'); } catch(e){}
 
-  // Score and rank matches
   const ql = q.toLowerCase();
-  const pool = _buildSearchPool();
-  _dsMatches = pool.map(d => {
-    const nameLower = d.name.toLowerCase();
-    const tagText = (d.tags||[]).map(t=>t.l||t).join(' ').toLowerCase();
+  _dsMatches[di] = _buildSearchPool().map(d => {
+    const nl = d.name.toLowerCase();
+    const tl = (d.tags||[]).map(t=>t.l||t).join(' ').toLowerCase();
     let score = 0;
-    if (nameLower === ql) score = 100;
-    else if (nameLower.startsWith(ql)) score = 80;
-    else if (nameLower.includes(ql)) score = 60;
-    else if (tagText.includes(ql)) score = 30;
+    if (nl === ql) score = 100;
+    else if (nl.startsWith(ql)) score = 80;
+    else if (nl.includes(ql)) score = 60;
+    else if (tl.includes(ql)) score = 30;
     return { d, score };
-  }).filter(x => x.score > 0).sort((a,b) => b.score - a.score).slice(0,8).map(x => x.d);
+  }).filter(x => x.score > 0).sort((a,b) => b.score - a.score).slice(0,7).map(x => x.d);
 
-  let html = '';
-  _dsMatches.forEach((d, idx) => {
-    const tagText = (d.tags||[]).slice(0,2).map(t=>t.l||t).join(' · ');
-    const meta = [d.time, d.serves ? 'Serves '+d.serves : '', tagText].filter(Boolean).join(' · ');
-    html += '<div class="dsr-item" onclick="selectDinnerResult('+idx+')">'
-          + '<div class="dsr-emoji">'+d.emoji+'</div>'
-          + '<div class="dsr-info"><div class="dsr-name">'+escHtml(d.name)+'</div>'
-          + (meta ? '<div class="dsr-meta">'+escHtml(meta)+'</div>' : '')
-          + '</div></div>';
-  });
+  let html = _dsMatches[di].map((d, idx) => {
+    const meta = [d.time, d.serves ? 'Serves '+d.serves : ''].filter(Boolean).join(' · ');
+    return '<div class="dsr-item" onclick="assignDayDinner('+di+','+idx+')">'
+      + '<div class="dsr-emoji">'+d.emoji+'</div>'
+      + '<div class="dsr-info"><div class="dsr-name">'+escHtml(d.name)+'</div>'
+      + (meta ? '<div class="dsr-meta">'+escHtml(meta)+'</div>' : '')
+      + '</div></div>';
+  }).join('');
 
   if (isUrl) {
-    html += '<div class="dsr-item" onclick="dinnerImportUrl('+JSON.stringify(escHtml(q))+')">'
-          + '<div class="dsr-emoji">🔗</div>'
-          + '<div class="dsr-info"><div class="dsr-name">Import recipe from this URL</div>'
-          + '<div class="dsr-meta">'+escHtml(q.length > 60 ? q.slice(0,57)+'…' : q)+'</div>'
-          + '</div></div>';
-  } else if (!_dsMatches.length) {
-    html += '<div class="dsr-no-match">No matches in your recipe book</div>';
+    const safeQ = escHtml(q);
+    html += '<div class="dsr-item" onclick="dinnerImportUrl(\''+safeQ+'\')">'
+      + '<div class="dsr-emoji">🔗</div>'
+      + '<div class="dsr-info"><div class="dsr-name">Import recipe from this URL</div>'
+      + '<div class="dsr-meta">'+escHtml(q.length>55?q.slice(0,52)+'…':q)+'</div>'
+      + '</div></div>';
+  } else if (!_dsMatches[di].length) {
+    html += '<div class="dsr-no-match">No matches — try Google below</div>';
   }
 
   const googleUrl = 'https://www.google.com/search?q='+encodeURIComponent(q+' dinner recipe');
-  html += '<a class="dsr-web" href="'+googleUrl+'" target="_blank" rel="noopener" onclick="clearDinnerSearch()">🌐 Search Google for "'+escHtml(q)+'" recipes</a>';
+  html += '<a class="dsr-web" href="'+googleUrl+'" target="_blank" rel="noopener" onclick="closeDaySearch()">🌐 Search Google for "'+escHtml(q)+'"</a>';
 
-  el.innerHTML = html;
-  el.style.display = '';
+  listEl.innerHTML = html;
+  listEl.style.display = '';
 }
 
-function selectDinnerResult(idx) {
-  const dinner = _dsMatches[idx];
+async function assignDayDinner(di, idx) {
+  const dinner = (_dsMatches[di] || [])[idx];
   if (!dinner) return;
-  _dsPending = dinner;
-  const el = document.getElementById('dinnerSearchResults');
-  const dayBtns = DAYS.map((day, di) => {
-    const cur = currentDinners[di];
-    const curLabel = cur ? cur.emoji + ' ' + (cur.name.length > 12 ? cur.name.slice(0,10)+'…' : cur.name) : '—';
-    return '<button class="dsr-day-btn" onclick="assignDinnerToDay('+di+')">'
-         + '<span>'+day+'</span>'
-         + '<span class="dsr-day-current">'+escHtml(curLabel)+'</span>'
-         + '</button>';
-  }).join('');
-  el.innerHTML = '<div class="dsr-day-picker">'
-    + '<div class="dsr-day-label">'+dinner.emoji+' '+escHtml(dinner.name)+' — pick a day to replace:</div>'
-    + '<div class="dsr-day-btns">'+dayBtns+'</div>'
-    + '</div>';
-}
-
-async function assignDinnerToDay(di) {
-  if (!_dsPending) return;
-  const dinner = _dsPending;
   currentDinners[di] = dinner;
-  clearDinnerSearch();
+  closeDaySearch();
   await savePlan();
   renderDinners(); renderGrid(); renderShop();
   showToast(dinner.emoji + ' ' + dinner.name + ' added to ' + DAYS[di] + '!');
 }
 
 function dinnerImportUrl(url) {
-  clearDinnerSearch();
-  // Switch to Recipes tab and pre-fill the URL import field if it exists
+  closeDaySearch();
   switchTab('recipes');
   const urlInput = document.getElementById('importUrl');
   if (urlInput) { urlInput.value = url; urlInput.focus(); }
   showToast('URL ready — hit "Import" to pull in the recipe!');
 }
 
-// Close dropdown when clicking outside
+// Close open day search when clicking outside any dinner card
 document.addEventListener('click', e => {
-  if (!document.getElementById('dinnerSearchWrap')?.contains(e.target)) clearDinnerSearch();
+  if (_dsActiveDay < 0) return;
+  if (!e.target.closest('.dinner-day')) closeDaySearch();
 });
 
 function buildRatingWidget(recipeId){
